@@ -45,6 +45,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(stdout)["outliers_removed"], 0)
 
+    def test_deseasonalize_option(self):
+        code, stdout, _ = self._run("--deseasonalize", "month", "--outliers", "zscore")
+        self.assertEqual(code, 0)
+        report = json.loads(stdout)
+        self.assertEqual(report["deseasonalized"], "month")
+        self.assertAlmostEqual(report["statistics"]["mean"], 0.0, places=6)
+
     def test_error_returns_nonzero_exit_code(self):
         code, _, err = self._run("--time-col", "missing")
         self.assertEqual(code, 1)

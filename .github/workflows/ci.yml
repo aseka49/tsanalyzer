@@ -58,7 +58,7 @@ jobs:
       - name: Run tests with coverage
         run: pytest --cov --cov-report=term-missing --cov-report=xml
       - name: Smoke-test the CLI on example data
-        run: tsanalyzer examples/temperature.csv --value-col temp_c --plot out/plot.png --report out/report.json
+        run: tsanalyzer examples/temperature.csv --value-col temp_c --deseasonalize dayofyear --plot out/plot.png --report out/report.json
       - name: Upload coverage and example outputs
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
