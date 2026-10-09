@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from tsanalyzer import __version__
-from tsanalyzer.cleaning import fill_missing, remove_outliers, resample
+from tsanalyzer.cleaning import deseasonalize, fill_missing, remove_outliers, resample
 from tsanalyzer.io import DataFormatError, load_csv
 from tsanalyzer.stats import autocorrelation, describe
 from tsanalyzer.trend import linear_trend, mann_kendall, moving_average
@@ -26,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--outliers", default="iqr", choices=["iqr", "zscore", "none"])
     p.add_argument("--threshold", type=float, default=None, help="outlier threshold (k or z)")
     p.add_argument("--resample", default=None, help="pandas frequency, e.g. W or MS")
+    p.add_argument(
+        "--deseasonalize",
+        choices=["month", "dayofyear"],
+        default=None,
+        help="analyse anomalies from the seasonal mean (month or dayofyear)",
+    )
     p.add_argument("--window", type=int, default=7, help="moving-average window (default: 7)")
     p.add_argument("--plot", type=Path, default=None, help="save a figure to this path")
     p.add_argument("--report", type=Path, default=None, help="save a JSON report to this path")
@@ -44,12 +50,16 @@ def run(args: argparse.Namespace) -> dict:
     if args.outliers != "none":
         series, outliers = remove_outliers(series, method=args.outliers, threshold=args.threshold)
     n_outliers = len(outliers)
+    if args.deseasonalize:
+        series = deseasonalize(series, period=args.deseasonalize)
+        outliers = outliers.iloc[0:0]  # outliers are plotted on the original scale only
 
     trend = linear_trend(series)
     report = {
         "input": str(args.csv),
         "filled_missing": raw_missing,
         "outliers_removed": int(n_outliers),
+        "deseasonalized": args.deseasonalize,
         "statistics": describe(series),
         "lag1_autocorrelation": autocorrelation(series, lag=1),
         "linear_trend": trend.to_dict(),

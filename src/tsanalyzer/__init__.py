@@ -11,7 +11,7 @@ Typical workflow::
     print(linear_trend(clean))
 """
 
-from tsanalyzer.cleaning import fill_missing, remove_outliers, resample
+from tsanalyzer.cleaning import deseasonalize, fill_missing, remove_outliers, resample
 from tsanalyzer.io import load_csv
 from tsanalyzer.stats import autocorrelation, describe
 from tsanalyzer.trend import TrendResult, linear_trend, mann_kendall, moving_average
@@ -19,6 +19,7 @@ from tsanalyzer.trend import TrendResult, linear_trend, mann_kendall, moving_ave
 __all__ = [
     "TrendResult",
     "autocorrelation",
+    "deseasonalize",
     "describe",
     "fill_missing",
     "linear_trend",

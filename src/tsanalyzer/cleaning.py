@@ -74,3 +74,19 @@ def resample(series: pd.Series, rule: str = "D", how: str = "mean") -> pd.Series
     if how not in ("mean", "sum", "min", "max", "median"):
         raise ValueError(f"Unsupported aggregation '{how}'")
     return getattr(series.resample(rule), how)()
+
+
+def deseasonalize(series: pd.Series, period: str = "month") -> pd.Series:
+    """Return anomalies: each value minus the long-term mean of its season.
+
+    The climatology is the average over all years for the same calendar
+    ``"month"`` or ``"dayofyear"``. Removing it exposes long-term trends that
+    a strong seasonal cycle would otherwise hide.
+    """
+    if not isinstance(series.index, pd.DatetimeIndex):
+        raise TypeError("deseasonalize() requires a DatetimeIndex")
+    if period not in ("month", "dayofyear"):
+        raise ValueError("period must be 'month' or 'dayofyear'")
+    key = getattr(series.index, period)
+    climatology = series.groupby(key).transform("mean")
+    return (series - climatology).rename(f"{series.name or 'value'}_anomaly")
