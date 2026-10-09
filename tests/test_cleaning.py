@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from tests.helpers import make_series
-from tsanalyzer.cleaning import fill_missing, remove_outliers, resample
+from tsanalyzer.cleaning import deseasonalize, fill_missing, remove_outliers, resample
 
 
 class FillMissingTests(unittest.TestCase):
@@ -84,6 +84,31 @@ class ResampleTests(unittest.TestCase):
     def test_bad_aggregation(self):
         with self.assertRaises(ValueError):
             resample(make_series(n=5), how="mode")
+
+
+class DeseasonalizeTests(unittest.TestCase):
+    def setUp(self):
+        idx = pd.date_range("2020-01-01", "2023-12-31", freq="D")
+        seasonal = 20 * np.sin(2 * np.pi * idx.dayofyear.to_numpy() / 365.25)
+        self.s = pd.Series(seasonal, index=idx, name="temp")
+
+    def test_removes_pure_seasonal_signal(self):
+        anomalies = deseasonalize(self.s, "dayofyear")
+        self.assertLess(anomalies.abs().max(), 1e-9)
+        self.assertEqual(anomalies.name, "temp_anomaly")
+
+    def test_monthly_climatology_has_zero_mean_per_month(self):
+        anomalies = deseasonalize(self.s, "month")
+        per_month = anomalies.groupby(anomalies.index.month).mean()
+        self.assertTrue(np.allclose(per_month, 0.0))
+
+    def test_requires_datetime_index(self):
+        with self.assertRaises(TypeError):
+            deseasonalize(pd.Series([1.0, 2.0]))
+
+    def test_bad_period(self):
+        with self.assertRaises(ValueError):
+            deseasonalize(self.s, "week")
 
 
 if __name__ == "__main__":
