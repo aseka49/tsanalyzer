@@ -4,7 +4,7 @@ title: "tsanalyzer: cleaning, statistics and trend analysis for scientific time 
 authors:
   - family-names: Kurmangaliev
     given-names: Asanali
-version: 1.0.0
-date-released: 2026-10-09
+version: 1.1.0
+date-released: 2026-11-06
 license: MIT
 repository-code: "https://github.com/aseka49/tsanalyzer"
