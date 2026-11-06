@@ -1,6 +1,8 @@
 # tsanalyzer
 
 [![CI](https://github.com/aseka49/tsanalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/aseka49/tsanalyzer/actions/workflows/ci.yml)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED)
+![Jenkins](https://img.shields.io/badge/CI%2FCD-Jenkins-D24939)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
 
@@ -46,6 +48,19 @@ Key options: `--fill {linear,ffill,bfill,drop}`, `--outliers {iqr,zscore,none}`,
 `--threshold`, `--resample W`, `--deseasonalize {month,dayofyear}`, `--window N`.
 Run `tsanalyzer --help` for the full list.
 
+### HTTP API
+
+```bash
+tsanalyzer-server --port 8000          # or run the Docker image, see below
+curl http://localhost:8000/health
+curl --data-binary @examples/temperature.csv \
+     "http://localhost:8000/analyze?value_col=temp_c&deseasonalize=dayofyear"
+```
+
+`POST /analyze` takes the CSV file as the request body and the CLI options as query parameters
+(`time_col`, `value_col`, `fill`, `outliers`, `threshold`, `resample`, `deseasonalize`) and returns the
+same JSON report as the command line. Errors return `400` (bad parameters), `422` (bad data) or `413` (> 10 MB).
+
 ### Python API
 
 ```python
@@ -76,15 +91,70 @@ recovers a value close to the true trend and makes the test much more confident.
 
 ![Anomalies after removing the seasonal cycle](docs/example_anomalies.png)
 
+## Docker
+
+The [Dockerfile](Dockerfile) has two targets: `test` (dev tools and tests, used by CI) and `runtime`
+(the default: a small image that runs the HTTP API as a non-root user, with a health check).
+
+```bash
+docker build -t tsanalyzer .
+docker run -d --name tsanalyzer -p 8000:8000 tsanalyzer       # API on http://localhost:8000
+docker run --rm --entrypoint tsanalyzer tsanalyzer examples/temperature.csv --value-col temp_c   # CLI
+docker build --target test -t tsanalyzer-test . && docker run --rm tsanalyzer-test               # tests
+```
+
+## CI/CD with Jenkins
+
+The [Jenkinsfile](Jenkinsfile) defines the pipeline. Every stage runs in Docker:
+
+| Stage | What happens |
+|---|---|
+| Build test image | `docker build --target test` |
+| Lint | `ruff check` and `ruff format --check` inside the test image |
+| Unit tests | `pytest` with coverage; JUnit and coverage reports are published in Jenkins |
+| Build image | `docker build --target runtime`, tagged `<version>-<build>-<commit>` and `latest` |
+| Smoke test | starts the container, waits for `healthy`, analyses the example file through the API |
+| Push to Docker Hub | only when Docker Hub credentials are configured |
+| Deploy to staging (CD) | replaces the `tsanalyzer-staging` container on port 8000 |
+| Deploy to Kubernetes (CD, optional) | `kubectl apply` + rolling update, enabled with the `DEPLOY_K8S` parameter |
+
+The job polls GitHub every ~2 minutes, so every commit to `main` is built automatically.
+
+### Run Jenkins locally (Docker Desktop on Windows/macOS, or Docker on Linux)
+
+```bash
+cd jenkins
+cp .env.example .env          # Windows: copy .env.example .env  — then set a password (and Docker Hub token)
+docker compose up -d --build  # first start downloads Jenkins and plugins (~5 min)
+```
+
+Open <http://localhost:8080> and log in (default `admin` / `admin123`). The **tsanalyzer CI/CD** job is
+created automatically from [jenkins/casc.yaml](jenkins/casc.yaml) (Configuration as Code + Job DSL) and
+starts its first build within two minutes. After a green build the staging API answers on
+<http://localhost:8000/health>.
+
+### Optional: deploy to Minikube
+
+```bash
+minikube start
+minikube image load tsanalyzer:latest      # or push to Docker Hub and use <user>/tsanalyzer
+kubectl apply -f k8s/
+kubectl rollout status deployment/tsanalyzer
+minikube service tsanalyzer --url          # then open <url>/health
+```
+
+To let Jenkins do this, add a *Secret file* credential with id `kubeconfig` and run the job with
+**Build with Parameters → DEPLOY_K8S**.
+
 ## Development
 
 ```bash
-pytest                      # run the test suite (47 tests)
+pytest                      # run the test suite (58 tests)
 pytest --cov                # with coverage (CI requires ≥ 85 %)
 ruff check . && ruff format --check .
 ```
 
-Continuous integration (`.github/workflows/ci.yml`) runs linting, the test suite on Python 3.11–3.14
+Two CI systems run the same checks: Jenkins (above) and GitHub Actions. GitHub Actions (`.github/workflows/ci.yml`) runs linting, the test suite on Python 3.11–3.14
 (plus Windows and macOS), a CLI smoke test and a package build on every push and pull request.
 Pushing a version tag (`git tag v1.0.0 && git push --tags`) triggers `.github/workflows/release.yml`,
 which builds the package and publishes a GitHub Release.
@@ -94,11 +164,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching and commit conventions.
 ## Project structure
 
 ```
-src/tsanalyzer/     package source (io, cleaning, stats, trend, plotting, cli)
-tests/              unit and CLI tests
+src/tsanalyzer/     package source (io, cleaning, stats, trend, plotting, cli, server)
+tests/              unit, CLI and HTTP API tests
 examples/           sample dataset
 docs/               figures and example reports
-.github/            CI/CD workflows, issue and PR templates
+.github/            GitHub Actions workflows, issue and PR templates
+Dockerfile          multi-stage image (test / runtime)
+Jenkinsfile         Jenkins CI/CD pipeline
+jenkins/            ready-to-run Jenkins server (Docker Compose + Configuration as Code)
+k8s/                Kubernetes Deployment and Service
 ```
 
 ## Citation
