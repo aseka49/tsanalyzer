@@ -1,0 +1,13 @@
+# Plugins installed into the Jenkins image (latest versions compatible with the LTS core)
+workflow-aggregator
+pipeline-stage-view
+pipeline-graph-view
+git
+github
+configuration-as-code
+job-dsl
+credentials-binding
+timestamper
+junit
+coverage
+ws-cleanup
