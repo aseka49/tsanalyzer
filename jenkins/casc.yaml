@@ -1,0 +1,64 @@
+# Jenkins Configuration as Code (JCasC).
+# Values like ${VAR:-default} come from environment variables set in docker-compose.yml / .env.
+jenkins:
+  systemMessage: "tsanalyzer CI/CD: this Jenkins is configured as code (jenkins/casc.yaml)"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DOCKERHUB_USER"
+            value: "${DOCKERHUB_USERNAME:-}"
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "dockerhub"
+              description: "Docker Hub user + access token (used only when DOCKERHUB_USERNAME is set)"
+              username: "${DOCKERHUB_USERNAME:-not-set}"
+              password: "${DOCKERHUB_TOKEN:-not-set}"
+
+jobs:
+  - script: |
+      pipelineJob('tsanalyzer') {
+        displayName('tsanalyzer CI/CD')
+        description('Lint, unit tests, Docker image build, smoke test, push to Docker Hub and deployment. Pipeline defined in the repository Jenkinsfile.')
+        properties {
+          pipelineTriggers {
+            triggers {
+              pollSCM {
+                scmpoll_spec('H/2 * * * *')
+              }
+            }
+          }
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('${REPO_URL:-https://github.com/aseka49/tsanalyzer.git}')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }

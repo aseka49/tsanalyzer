@@ -1,0 +1,28 @@
+# Ready-to-run Jenkins for the tsanalyzer pipeline.
+#   cd jenkins
+#   copy .env.example .env      (Windows)   |   cp .env.example .env   (Linux/macOS)
+#   docker compose up -d --build
+#   open http://localhost:8080  (login from .env, default admin / admin123)
+services:
+  jenkins:
+    build: .
+    image: tsanalyzer-jenkins:latest
+    container_name: jenkins
+    # Runs as root so the pipeline can use the host Docker engine via the socket below.
+    # Fine for a local lab machine; on a shared server use a dedicated agent or rootless Docker instead.
+    user: root
+    ports:
+      - "8080:8080"
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-admin123}
+      DOCKERHUB_USERNAME: ${DOCKERHUB_USERNAME:-}
+      DOCKERHUB_TOKEN: ${DOCKERHUB_TOKEN:-}
+      REPO_URL: ${REPO_URL:-https://github.com/aseka49/tsanalyzer.git}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:
