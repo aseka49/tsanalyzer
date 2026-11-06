@@ -1,0 +1,25 @@
+# Keep the build context small and avoid leaking local files into images
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+build
+dist
+.pytest_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+reports
+out
+docs
+jenkins
+k8s
+deploy
+*.md
+!README.md
+Dockerfile
+.dockerignore

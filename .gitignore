@@ -23,3 +23,7 @@ out/
 .vscode/
 .idea/
 .DS_Store
+
+# Docker / Jenkins
+reports/
+jenkins/.env
